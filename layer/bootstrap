@@ -1,0 +1,5 @@
+#!/bin/bash
+cd "$(dirname "$0")"
+echo $PWD
+date -u
+./powershell/pwsh ./runtime.ps1 -NonInteractive -NoProfile
