@@ -12,6 +12,12 @@ param(
 $VerbosePreference = "Continue"
 
 Push-Location $PSScriptRoot
+If(-not(Test-Path './layer/powershell/pwsh'))
+{
+    Write-Error '[./layer/powershell/pwsh] is missing. Donload and place powershell in the [./layer/powershell] folder.' -ErrorAction Stop
+
+}
+
 Write-Verbose "Creating artifacts"
 if($isWindows){
     bash createzips.sh | Out-Null

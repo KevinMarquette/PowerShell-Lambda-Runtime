@@ -382,8 +382,8 @@ chmod 755 ./layer/powershell/pwsh
 ## PowerShell Preview
 If you want to use a preview or release candidate of PowerShell, you will need to edit the `./layer/bootstrap` file to specify `pwsh-preview` instead of `pwsh`. This is the only file that directly references the `pwsh` executable.
 
-``` bash
-./powershell/pwsh-preview ./runtime.ps1 -NonInteractive -NoProfile
+``` powershell
+#!/usr/bin/env /opt/powershell/pwsh-preview
 ```
 
 Download your desired release version and add it to the `./layer/powershell` folder just like you would for regular PowerShell.
