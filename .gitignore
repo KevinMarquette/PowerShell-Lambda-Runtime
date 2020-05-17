@@ -1,1 +1,3 @@
 *.zip
+/layer/powershell/*
+!layer/powershell/README.md

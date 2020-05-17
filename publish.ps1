@@ -6,7 +6,8 @@
 param(
     $S3Bucket = 'kemarqu-temp',
     $LambdaRole = 'lambda-role',
-    [switch]$BootStrap
+    [switch]$BootStrap,
+    [switch]$LambdaOnly
 )
 $VerbosePreference = "Continue"
 
@@ -17,22 +18,30 @@ if($isWindows){
 }else{
     createzips.sh | Out-Null
 }
-Write-S3Object -BucketName $S3Bucket -File .\layer.zip
+
 Write-S3Object -BucketName $S3Bucket -File .\function.zip
 
-$LMLayerVersion = @{
-    CompatibleRuntime = 'dotnetcore3.1'
-    Description = 'Custom pwsh runtime'
-    LayerName = 'pwsh-runtime'
-    LicenseInfo = 'mit'
-    Content_S3Bucket = $S3Bucket
-    Content_S3Key = 'layer.zip'
-    OutVariable = 'layer'
-}
-$layer = Publish-LMLayerVersion @LMLayerVersion
+if(!$LambdaOnly){
+    Write-S3Object -BucketName $S3Bucket -File .\layer.zip
 
+    $LMLayerVersion = @{
+        CompatibleRuntime = 'dotnetcore3.1'
+        Description = 'Custom pwsh runtime'
+        LayerName = 'pwsh-runtime'
+        LicenseInfo = 'mit'
+        Content_S3Bucket = $S3Bucket
+        Content_S3Key = 'layer.zip'
+        OutVariable = 'layer'
+    }
+    $layer = Publish-LMLayerVersion @LMLayerVersion
+}
+else
+{
+    $layer = Get-LMLayerVersionList -LayerName pwsh-runtime | Select -First 1
+}
 #Remove-LMFunction -FunctionName pwsh-runtime
-if($BootStrap){
+if($BootStrap)
+{
     $LMFunction = @{
         TimeOut = 10
         Code_S3Bucket = $S3Bucket
@@ -45,7 +54,8 @@ if($BootStrap){
     }
     Publish-LMFunction @LMFunction
 }
-else{
+else
+{
     $null = @(
         $LMFunctionConfiguration = @{
             FunctionName = 'pwsh-runtime'

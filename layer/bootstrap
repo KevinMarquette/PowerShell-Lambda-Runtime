@@ -1,3 +1,60 @@
-#!/bin/bash
-cd "$(dirname "$0")"
-./powershell/pwsh ./runtime.ps1 -NonInteractive -NoProfile
+#!/usr/bin/env /opt/powershell/pwsh
+
+Write-Host "PowerShell-Lambda-Runtime bootstrap"
+$ErrorActionPreference = "Stop"
+$private:runtimePath = '/opt'
+
+Write-Verbose "Importing runtime helpers" -Verbose
+$env:PSModulePath = Join-Path $private:runtimePath 'modules'
+Import-Module pwsh-runtime
+
+try
+{
+    Format-Environment
+    Push-Location $env:LAMBDA_TASK_ROOT
+
+    Set-PSModulePath -ProjectPath $env:LAMBDA_TASK_ROOT -RuntimePath $private:runtimePath
+
+    $private:invocation = Get-LambdaInvocation -Hander $env:_HANDLER
+    $private:module = $private:invocation.module
+    $private:function = $private:invocation.function
+
+    if($private:module)
+    {
+        Write-Verbose "  Importing Module [$private:module]" -Verbose
+        Import-Module $private:module -Force
+    }
+
+    while($true) # intentional infinite loop
+    {
+        Remove-Variable eventDate,header,body,webRequest,psitem -ErrorAction Ignore -Scope private
+        $env:_X_AMZN_TRACE_ID = ''
+
+        try
+        {
+            Write-Verbose "Checking for next invocation" -Verbose
+            $private:webRequest = Get-LambdaNextRequest
+            $private:header = $private:webRequest.Headers
+            $private:requestId = $private:header["Lambda-Runtime-Aws-Request-Id"]
+            $env:_X_AMZN_TRACE_ID = $private:header["Lambda-Runtime-Trace-Id"]
+
+            #Copy-HeaderToEnvVariables -Header $private:header
+            $private:context = Get-LambdaContext -Header $private:header
+            $private:eventData = Get-LambdaEventData -InputObject $private:WebRequest
+
+            Write-Verbose "Invoking [$private:function]" -Verbose
+            $private:body = & $private:function $private:eventData $private:context -Verbose | Out-String -width 1024
+
+            Publish-LambdaResponse -Body $private:body -requestId $private:requestId
+        }
+        catch
+        {
+            Publish-LambdaErrorDetails -InputObject $PSItem -RequestID $private:requestId -Header $private:header
+        }
+    }
+}
+catch
+{
+    Publish-LambdaErrorDetails -InputObject $PSItem
+    Exit 1
+}
