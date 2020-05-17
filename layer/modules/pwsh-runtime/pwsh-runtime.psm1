@@ -1,12 +1,29 @@
 
 function Script:Get-LambdaApiUri {
-    param(
-        [validateset('RuntimeError','Next','Response','Error')]
+    <#
+        .Notes
+        Provides one of the 4 Lambda runtime interfaces
+    #>
+    param
+    (
+        [parameter(mandatory)]
+        [validateset(
+            'RuntimeError',
+            'Next',
+            'Response',
+            'Error'
+        )]
+        [string]
         $Endpoint,
+
+        [string]
         $RequestId = 'undefined',
-        $lambdaApi = $env:AWS_LAMBDA_RUNTIME_API
+
+        [string]
+        $LambdaApi = $env:AWS_LAMBDA_RUNTIME_API
     )
-    $baseUri = "http://$lambdaApi/2018-06-01/runtime"
+
+    $baseUri = "http://$LambdaApi/2018-06-01/runtime"
     $uri = @{
         RuntimeError = "$baseUri/init/error"
         Next = "$baseUri/invocation/next"
@@ -36,7 +53,9 @@ function Get-LambdaEventData {
 
     if($InputObject.Headers['Content-Type'] -eq 'application/json')
     {
-        # using EA Ignore so if it can't convert to json it leaves the original value unchanged
+        #TotalyNotAHack
+        # using EA Ignore so if it can't convert to json
+        # it will leave the original value unchanged
         $eventData = $eventData | ConvertFrom-Json -AsHashtable -ErrorAction Ignore
     }
     $eventData
@@ -44,16 +63,22 @@ function Get-LambdaEventData {
 
 function Publish-LambdaResponse
 {
-    param($Body,$RequestId)
+    param
+    (
+        $Body,
 
-    $uri = Get-LambdaApiUri -Endpoint Response -RequestID $requestId
+        [string]
+        $RequestId
+    )
+
+    $uri = Get-LambdaApiUri -Endpoint Response -RequestID $RequestId
     $restMethod = @{
         Uri = $uri
         Method = 'Post'
     }
-    if($body){
-        Write-Verbose "Posting Response @[$body]@" -Verbose
-        $restMethod['Body'] = $body
+    if($Body){
+        Write-Verbose "Posting Response [$Body]" -Verbose
+        $restMethod['Body'] = $Body
     }
 
     Write-Verbose "Posting Execution Success" -Verbose
@@ -62,20 +87,43 @@ function Publish-LambdaResponse
 
 function Get-LambdaInvocation
 {
-    param($handler = $env:_HANDLER)
-    Write-Verbose "Handler [$handler]" -Verbose
-    switch -regex ($handler)
+    <#
+        .DESCRIPTION
+        Parses the hander to identify the function and module
+
+        .Notes
+        Hander can be any of these patterns
+            Module and Function:
+                [MyModule.MyFunction]
+                [MyModule.psd1.MyFunction]
+                [./MyModule.psm1.MyFunction]
+                [./src/MyModule.psm1.MyFunction]
+            Script:
+                [./myscript.ps1]
+    #>
+    param
+    (
+        [string]
+        $Handler = $env:_HANDLER
+    )
+
+    Write-Verbose "Handler [$Handler]" -Verbose
+    switch -regex ($Handler)
     {
         $null
         {
             Write-Error "HandlerNotDefined"
+            continue
         }
+        # Script only
         '.*\.ps1$'
         {
-            # using resolve path to both discover and validate path
+            # use of Resolve-Path to both discover and validate path
+            # errors will exit to exception handler
             $function = (Resolve-Path $PSItem).Path
             continue
         }
+        # MyModule.MyFunction patterns
         '^(?<module>.*(?<file>\.ps[dm]1)?)\.(?<function>.*)$'
         {
             $function = $matches.function
@@ -87,6 +135,7 @@ function Get-LambdaInvocation
             }
             else
             {
+                # the module could be at the project root
                 if(Test-Path "$module.psd1")
                 {
                     $module = (Resolve-Path "$module.psd1").Path
@@ -98,12 +147,15 @@ function Get-LambdaInvocation
             }
             continue
         }
+        # last ditch effort to find something
         default
         {
             $function = (Resolve-Path "$PSItem.ps1").Path
         }
     }
+
     Write-Verbose "  Using Invocation [$function]" -Verbose
+
     return [pscustomobject]@{
         function = $function
         module = $module
@@ -112,11 +164,16 @@ function Get-LambdaInvocation
 
 function Get-LambdaContext
 {
-    param($Header)
+    param(
+        $Header
+    )
     $context= @{}
-    Get-ChildItem env: | Foreach {
+
+    # Injecting all environment variables
+    Get-ChildItem -Path env: | ForEach-Object {
         $context[$_.name] = $_.value
     }
+
     if($Header)
     {
         $Header.GetEnumerator() | Foreach-Object {
@@ -128,21 +185,36 @@ function Get-LambdaContext
 
 function Publish-LambdaErrorDetails
 {
-    param($InputObject,$RequestId,$Header)
+    param
+    (
+        $InputObject,
+        [string]
+        $RequestId,
+        $Header
+    )
+
     Write-Verbose "Processing Error Info [$RequestId]" -Verbose
     if($RequestId)
     {
-        $uri = Get-LambdaApiUri -Endpoint Error -RequestID $RequestId
+        $lambdaApiUri = @{
+            Endpoint = 'Error'
+            RequestID = $RequestId
+        }
     }
     else
     {
-        $uri = Get-LambdaApiUri -Endpoint RuntimeError
+        $lambdaApiUri = @{
+            Endpoint = 'RuntimeError'
+        }
     }
+
+    $uri = Get-LambdaApiUri @lambdaApiUri
 
     $lambdaError = [ordered]@{
         errorType = $InputObject.Exception.GetType().Name
         errorMessage = $InputObject.ToString()
     }
+
     if($env:Debug -eq 'true')
     {
         $lambdaError.errorRecord = @{
@@ -170,11 +242,14 @@ function Publish-LambdaErrorDetails
             'Debug_Message' = 'Set Debug="true" as an environment variable for all environment variables, headers, and errorrecord details.'
         }
     }
-    Write-Verbose "Dispaying details" -Verbose
+
+    Write-Verbose "Error Details" -Verbose
     Write-Warning ($InputObject | Format-List '*' -Force | Out-String)
-    Write-Verbose "Create body" -Verbose
+
+    Write-Verbose "Create Error Body" -Verbose
     $body = $lambdaError | ConvertTo-Json
-    Write-Verbose "Posting error to [$uri]"
+
+    Write-Verbose "Posting error to [$uri]" -Verbose
     $body | Invoke-RestMethod -Uri $uri -Method Post -Header @{
         'Lambda-Runtime-Function-Error-Type' = $lambdaError.errorType
     }
@@ -182,20 +257,36 @@ function Publish-LambdaErrorDetails
 
 function Format-Environment
 {
+    # Outputs environment variables, uses patten that could be used in powershell
     Write-Verbose "Environment Variables:" -Verbose
-    Get-ChildItem env: | Foreach {
+    Get-ChildItem -Path env: | Foreach-Object {
         Write-Output ('$env:{0} = "{1}"'-f $_.name, $_.value)
     }
 }
 
 function Set-PSModulePath {
-    param($ProjectPath,$RuntimePath)
+    <#
+        .Notes
+        Sets the module path to the equivalent of these project paths:
+          ./function                 # root of project
+          ./function/modules         # project modules folder
+          ./layer/modules            # runtime modules folder
+          ./layer/powershell/modules # build in modules
+    #>
+    param
+    (
+        [string]
+        $ProjectPath,
+        [string]
+        $RuntimePath
+    )
+
     Write-Verbose "Configuring PSModulePath" -Verbose
     $env:PSModulePath = @(
         $ProjectPath
         Join-Path $ProjectPath 'modules'
         Join-Path $RuntimePath 'modules'
         Join-Path $RuntimePath 'powershell' 'modules'
-    ) -join ':'
+    ) -join ':' # linux uses : to join paths
     Write-Verbose "  [$env:PSModulePath]"
 }

@@ -1,8 +1,8 @@
-Write-Host "Custom pwsh runtime -kemarqu"
+Write-Host "PowerShell-Lambda-Runtime"
 $ErrorActionPreference = "Stop"
 $runtimePath = $PWD
 Write-Verbose "Importing runtime helpers" -Verbose
-$env:PSModulePath = Join-Path $RuntimePath 'modules'
+$env:PSModulePath = Join-Path $runtimePath 'modules'
 Import-Module pwsh-runtime
 
 try
@@ -22,7 +22,7 @@ try
         Import-Module $module -Force
     }
 
-    while($true) #infinite loop
+    while($true) # intentional infinite loop
     {
         Remove-Variable eventDate,header,body,webRequest -ErrorAction Ignore
         $env:_X_AMZN_TRACE_ID = ''
@@ -39,8 +39,6 @@ try
             $eventData = Get-LambdaEventData -InputObject $WebRequest
 
             Write-Verbose "Invoking [$function]" -Verbose
-            Write-Verbose "  EventData [$eventData]" -Verbose
-            Write-Verbose "  Type [$($eventData.GetType())]]" -Verbose
             $body = & $function $eventData $context -Verbose | Out-String -width 1024
 
             Publish-LambdaResponse -Body $body -requestId $requestId
