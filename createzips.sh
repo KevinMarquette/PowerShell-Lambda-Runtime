@@ -2,7 +2,7 @@
 cd layer
 echo "creating layer.zip"
 chmod 755 bootstrap
-chmot 755 powershell/pwsh
+chmod 755 powershell/pwsh
 zip -r ../layer.zip ./*
 
 cd ../function
