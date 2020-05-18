@@ -37,9 +37,9 @@ function Get-LambdaNextRequest
 {
     $uri = Get-LambdaApiUri -Endpoint Next
     $webRequest = Invoke-WebRequest -Uri $uri -Method Get -Verbose
-    Write-Verbose "Headers:" -Verbose
+    Write-Verbose 'Headers:' -Verbose
     $webRequest.headers.GetEnumerator() | Foreach-Object {
-        Write-Verbose ("  {0} [{1}]:"-f $_.key, ($_.value -join ',')) -Verbose
+        Write-Verbose ('  {0} [{1}]:'-f $_.key, ($_.value -join ',')) -Verbose
     }
     $webRequest
 }
@@ -48,7 +48,7 @@ function Get-LambdaEventData {
     param($InputObject)
 
     $eventData = $InputObject.content
-    Write-Verbose "Event Contents:" -Verbose
+    Write-Verbose 'Event Contents:' -Verbose
     Write-Verbose $eventData -Verbose
 
     if($InputObject.Headers['Content-Type'] -eq 'application/json')
@@ -81,7 +81,7 @@ function Publish-LambdaResponse
         $restMethod['Body'] = $Body
     }
 
-    Write-Verbose "Posting Execution Success" -Verbose
+    Write-Verbose 'Posting Execution Success' -Verbose
     Invoke-RestMethod @restMethod
 }
 
@@ -112,7 +112,7 @@ function Get-LambdaInvocation
     {
         $null
         {
-            Write-Error "HandlerNotDefined"
+            Write-Error 'HandlerNotDefined'
             continue
         }
         # Script only
@@ -130,7 +130,8 @@ function Get-LambdaInvocation
             $module = $matches.module
 
             # if its a path to a module, resolve it
-            if($matches.file){
+            if($matches.file)
+            {
                 $module = (Resolve-Path $module).Path
             }
             else
@@ -225,10 +226,10 @@ function Publish-LambdaErrorDetails
             targetSite = $InputObject.Exception.TargetSite  | Out-String
 
             scriptStackTrace = $InputObject.ScriptStackTrace ?
-                $InputObject.ScriptStackTrace -split "\n" : $null
+                $InputObject.ScriptStackTrace -split '\n' : $null
 
             stackTrace = $InputObject.Exception.StackTrace ?
-                $InputObject.Exception.StackTrace -split "\n" : $null
+                $InputObject.Exception.StackTrace -split '\n' : $null
         }
         $lambdaError.context = Get-LambdaContext -Header $Header
     }
@@ -243,10 +244,10 @@ function Publish-LambdaErrorDetails
         }
     }
 
-    Write-Verbose "Error Details" -Verbose
+    Write-Verbose 'Error Details' -Verbose
     Write-Warning ($InputObject | Format-List '*' -Force | Out-String)
 
-    Write-Verbose "Create Error Body" -Verbose
+    Write-Verbose 'Create Error Body' -Verbose
     $body = $lambdaError | ConvertTo-Json
 
     Write-Verbose "Posting error to [$uri]" -Verbose
@@ -258,7 +259,7 @@ function Publish-LambdaErrorDetails
 function Format-Environment
 {
     # Outputs environment variables, uses patten that could be used in powershell
-    Write-Verbose "Environment Variables:" -Verbose
+    Write-Verbose 'Environment Variables:' -Verbose
     Get-ChildItem -Path env: | Foreach-Object {
         Write-Output ('$env:{0} = "{1}"'-f $_.name, $_.value)
     }
@@ -266,12 +267,12 @@ function Format-Environment
 
 function Set-PSModulePath {
     <#
-        .Notes
-        Sets the module path to the equivalent of these project paths:
-          ./function                 # root of project
-          ./function/modules         # project modules folder
-          ./layer/modules            # runtime modules folder
-          ./layer/powershell/modules # build in modules
+    .Notes
+    Sets the module path to the equivalent of these project paths:
+        ./function                 # root of project
+        ./function/modules         # project modules folder
+        ./layer/modules            # runtime modules folder
+        ./layer/powershell/modules # build in modules
     #>
     param
     (
