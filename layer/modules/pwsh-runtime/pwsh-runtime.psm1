@@ -56,7 +56,14 @@ function Get-LambdaEventData {
         #TotalyNotAHack
         # using EA Ignore so if it can't convert to json
         # it will leave the original value unchanged
-        $eventData = $eventData | ConvertFrom-Json -AsHashtable -ErrorAction Ignore
+        try
+        {
+            $eventData = $eventData | ConvertFrom-Json -AsHashtable -ErrorAction Ignore
+        }
+        catch
+        {
+            ""
+        }
     }
     $eventData
 }

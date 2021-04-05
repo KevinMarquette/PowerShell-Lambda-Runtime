@@ -38,7 +38,6 @@ try
             $private:requestId = $private:header["Lambda-Runtime-Aws-Request-Id"]
             $env:_X_AMZN_TRACE_ID = $private:header["Lambda-Runtime-Trace-Id"]
 
-            #Copy-HeaderToEnvVariables -Header $private:header
             $private:context = Get-LambdaContext -Header $private:header
             $private:eventData = Get-LambdaEventData -InputObject $private:WebRequest
 
