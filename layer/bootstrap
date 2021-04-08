@@ -1,10 +1,10 @@
 #!/usr/bin/env /opt/powershell/pwsh
 
-Write-Host "PowerShell-Lambda-Runtime bootstrap"
-$ErrorActionPreference = "Stop"
+Write-Host 'PowerShell-Lambda-Runtime bootstrap'
+$ErrorActionPreference = 'Stop'
 $private:runtimePath = '/opt'
 
-Write-Verbose "Importing runtime helpers" -Verbose
+Write-Verbose 'Importing runtime helpers' -Verbose
 $env:PSModulePath = Join-Path $private:runtimePath 'modules'
 Import-Module pwsh-runtime
 
@@ -14,6 +14,7 @@ try
     Push-Location $env:LAMBDA_TASK_ROOT
 
     Set-PSModulePath -ProjectPath $env:LAMBDA_TASK_ROOT -RuntimePath $private:runtimePath
+    $private:modulePath = $env:PSModulePath
 
     $private:invocation = Get-LambdaInvocation -Hander $env:_HANDLER
     $private:module = $private:invocation.module
@@ -27,12 +28,15 @@ try
 
     while($true) # intentional infinite loop
     {
-        Remove-Variable eventDate,header,body,webRequest,psitem -ErrorAction Ignore -Scope private
+        # Clean up environment variables
         $env:_X_AMZN_TRACE_ID = ''
+        $env:PSModulePath = $private:modulePath
+        $Global:LASTEXITCODE = 0
+        Remove-Variable eventDate,header,body,webRequest,psitem -ErrorAction Ignore -Scope private
 
         try
         {
-            Write-Verbose "Checking for next invocation" -Verbose
+            Write-Verbose 'Checking for next invocation' -Verbose
             $private:webRequest = Get-LambdaNextRequest
             $private:header = $private:webRequest.Headers
             $private:requestId = $private:header["Lambda-Runtime-Aws-Request-Id"]
@@ -49,6 +53,12 @@ try
         catch
         {
             Publish-LambdaErrorDetails -InputObject $PSItem -RequestID $private:requestId -Header $private:header
+        }
+        finally
+        {
+            # Remove possible execution artifacts
+            Get-Job | Remove-Job -Force -ErrorAction Ignore
+            Get-PSSession | Remove-PSSession -ErrorAction Ignore
         }
     }
 }

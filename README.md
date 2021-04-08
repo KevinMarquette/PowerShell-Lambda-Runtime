@@ -353,6 +353,10 @@ The `Context` object that is passed as the second parameter is not the same cont
 ### ClientContext/MobileContext
 `ClientContext` and `MobileContext` are not implemented. I saw some details related to them but was able to get the project working by ignoring them. This may be left up to whoever needs it to add it. I think its just pulling more details from the environment or request header and adding it to the `Context` object.
 
+## Shared Execution Environment
+
+Multiple executions can execute in the same PowerShell session as previous executions. Each execution is in its own scope so any locally scoped variables will be cleared out between execution. Globally scoped and environment variables can persist across lambda calls. Some modules will also internally maintain state that may persist.
+
 ## Amazon X-Ray
 I am not sure if Amazon X-Ray is implemented correctly. What I have is untested and feels like it should not be enough.
 
