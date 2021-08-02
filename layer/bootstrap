@@ -10,7 +10,6 @@ Import-Module pwsh-runtime
 
 try
 {
-    Format-Environment
     Push-Location $env:LAMBDA_TASK_ROOT
 
     Set-PSModulePath -ProjectPath $env:LAMBDA_TASK_ROOT -RuntimePath $private:runtimePath

@@ -247,7 +247,7 @@ function Publish-LambdaErrorDetails
             'AWS_LAMBDA_LOG_GROUP_NAME' = $env:AWS_LAMBDA_LOG_GROUP_NAME
             'Lambda-Runtime-Aws-Request-Id' = $Header['Lambda-Runtime-Aws-Request-Id']
             'Debug' = 'false'
-            'Debug_Message' = 'Set Debug="true" as an environment variable for all environment variables, headers, and errorrecord details.'
+            'Debug_Message' = 'Set Debug="true" as an environment variable for all headers and errorrecord details.'
         }
     }
 
@@ -260,15 +260,6 @@ function Publish-LambdaErrorDetails
     Write-Verbose "Posting error to [$uri]" -Verbose
     $body | Invoke-RestMethod -Uri $uri -Method Post -Header @{
         'Lambda-Runtime-Function-Error-Type' = $lambdaError.errorType
-    }
-}
-
-function Format-Environment
-{
-    # Outputs environment variables, uses patten that could be used in powershell
-    Write-Verbose 'Environment Variables:' -Verbose
-    Get-ChildItem -Path env: | Foreach-Object {
-        Write-Output ('$env:{0} = "{1}"'-f $_.name, $_.value)
     }
 }
 
